@@ -83,13 +83,26 @@ class ClearCache extends ReportWidgetBase
     }
 
     private function getDirSize($directory) {
-        if(!file_exists($directory) || count(scandir($directory)) <= 2) {
+        if (!File::exists($directory)) {
             return 0;
         }
+
         $size = 0;
-        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory)) as $file) {
+
+        foreach (File::allFiles($directory) as $file) {
             $size += $file->getSize();
         }
+
+        return $size;
+    }
+
+    private function getDirSizeNotRecursive($directory) {
+        $size = 0;
+
+        foreach (File::files($directory) as $file) {
+            $size += $file->getSize();
+        }
+
         return $size;
     }
 
@@ -111,9 +124,16 @@ class ClearCache extends ReportWidgetBase
         $s['ctwig']       = $this->formatSize($s['ctwig_b']);
         $s['fcache_b']    = $this->getDirSize(storage_path() . self::FRAMEWORK_CACHE_PATH);
         $s['fcache']      = $this->formatSize($s['fcache_b']);
+        $s['tempm_b']    = $this->getDirSize(temp_path('media'));
+        $s['tempm']      = $this->formatSize($s['tempm_b']);
+        $s['tempp_b']    = $this->getDirSize(temp_path('public'));
+        $s['tempp']      = $this->formatSize($s['tempp_b']);
         $s['tempu_b']    = $this->getDirSize(temp_path('uploads'));
         $s['tempu']      = $this->formatSize($s['tempu_b']);
-        $s['all']         = $this->formatSize($s['ccache_b'] + $s['ccombiner_b'] + $s['ctwig_b'] + $s['fcache_b'] + $s['tempu_b']);
+        $s['tempf_b']    = $this->getDirSizeNotRecursive(temp_path(''));
+        $s['tempf']      = $this->formatSize($s['tempf_b']);
+        $s['all']         = $this->formatSize($s['ccache_b'] + $s['ccombiner_b'] + $s['ctwig_b'] + $s['fcache_b']
+            + $s['tempm_b'] + $s['tempp_b'] + $s['tempu_b'] + $s['tempf_b']);
         return $s;
     }
 
@@ -134,17 +154,49 @@ class ClearCache extends ReportWidgetBase
     }
 
     private function delTemp(){
-        if ($tempUploads = temp_path('uploads')) {
-            if (File::exists(temp_path('uploads'))) {
+        $this->removeTempAllFilesAndDirectories('media');
+
+        $this->removeTempAllFilesAndDirectories('public');
+
+        $this->removeTempAllFilesAndDirectories('uploads');
+
+        $this->removeTempFiles();
+    }
+
+    /**
+     * @param $subDir
+     * @desc Remove files in sub dir under temp_path directory (recursive)
+     */
+    private function removeTempAllFilesAndDirectories($subDir) {
+        if ($tempUploads = temp_path($subDir)) {
+            if (File::exists(temp_path($subDir))) {
                 $allFiles = File::allFiles($tempUploads);
+
                 foreach ($allFiles as $file) {
                     File::delete($file);
                 }
+
                 $allFolders = array_reverse(File::directories($tempUploads));
+
                 foreach ($allFolders as $directory) {
                     if (!File::allFiles($directory)) {
                         File::deleteDirectory($directory);
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * @desc Remove files in exactly temp_path dir. No recursive and without hidden files
+     */
+    private function removeTempFiles() {
+        if ($tempUploads = temp_path('')) {
+            if (File::exists(temp_path(''))) {
+                $files = File::files($tempUploads);
+
+                foreach ($files as $file) {
+                    File::delete($file);
                 }
             }
         }
