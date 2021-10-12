@@ -89,6 +89,12 @@ class ClearCache extends ReportWidgetBase
 
         $size = 0;
 
+        $duSize = trim(`du -s --block-size=1 {$directory} | cut -f1`);
+
+        if ($duSize !== false && $duSize !== null) {
+            return $duSize;
+        }
+
         foreach (File::allFiles($directory) as $file) {
             $size += $file->getSize();
         }
